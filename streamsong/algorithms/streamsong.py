@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+data_colors = ('lightskyblue', 'lightpink', 'mediumspringgreen', 'gold', 'mediumpurple')
+prototype_colors = ('blue', 'red', 'green', 'darkorange', 'darkviolet')
+
 class StreamSoNG():
     def __init__(self, ng, pknn, sp1m, typicality_threshold, learning_rate=0.1, neighborhood_range=2, num_points_for_new_class=10):
         self.ng = ng
@@ -13,9 +16,6 @@ class StreamSoNG():
         self.outliers = []
     
     def visualize(self, X, Y, show_radius=False):
-        data_colors = ('lightskyblue', 'lightpink', 'mediumspringgreen', 'gold', 'mediumpurple')
-        prototype_colors = ('blue', 'red', 'green', 'darkorange', 'darkviolet')
-
         fig, ax = plt.subplots(figsize=(10, 10))
         
         Y_pred = np.full_like(Y, np.nan)
@@ -42,8 +42,45 @@ class StreamSoNG():
                     ax.add_patch(circle)
 
         ax.set_aspect(1)
-        plt.legend()
-        plt.show()
+        ax.legend()
+        plt.close(fig)
+        return fig
+
+    def visualize_prediction(self, X, Y, show_radius=False):
+        fig, ax = plt.subplots(figsize=(10, 10))
+        
+        # samples
+        Y_pred = np.full_like(Y, np.nan)
+        for i, (x, j) in enumerate(zip(X, Y)):
+            Y_pred[i], typicality_class, _, s_typ, average_typicalities = self.pknn.predict(x, j)
+
+            if Y_pred[i] == Y[i]:
+                marker = 'o'
+                color = data_colors[int(Y_pred[i])]
+                edgecolor = 'white'
+            else:
+                marker = 'X'
+                color = 'black'
+                edgecolor = data_colors[int(Y[i])]
+
+            ax.scatter(x[0], x[1], marker=marker, color=color, edgecolor=edgecolor)
+
+        # prototypes
+        for c in range(self.pknn.num_classes):
+            indices = np.where(self.pknn.prototype_labels == c)
+            prototypes_c = self.pknn.prototypes[indices]
+            ax.scatter(prototypes_c[:, 0], prototypes_c[:, 1], c=prototype_colors[c], label=f"prototypes {c}", marker="s")
+            if show_radius:
+                for i in range(len(prototypes_c)):
+                    x = prototypes_c[i, 0]
+                    y = prototypes_c[i, 1]
+                    circle = plt.Circle((x, y), self.pknn.radius[c], color=prototype_colors[c], fill=False, linestyle="--")
+                    ax.add_patch(circle)
+
+        ax.set_aspect(1)
+        ax.legend()
+        plt.close(fig)
+        return fig
     
     def update(self, k, prototype_idx, typicality_class, x):
         self.pknn.prototypes[prototype_idx] += self.learning_rate * typicality_class * np.exp((-k / self.neighborhood_range)) * (x - self.pknn.prototypes[prototype_idx])
